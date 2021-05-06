@@ -6,8 +6,9 @@ from torch.optim.lr_scheduler import MultiStepLR
 from config import BATCH_SIZE, PROPOSAL_NUM, SAVE_FREQ, LR, WD, resume, save_dir
 from core import model, dataset
 from core.utils import init_log, progress_bar
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '0,1,2,3'
 start_epoch = 1
 save_dir = os.path.join(save_dir, datetime.now().strftime('%Y%m%d_%H%M%S'))
 if os.path.exists(save_dir):
@@ -20,10 +21,10 @@ DATESET_PATH = "./rgb"
 # read dataset
 trainset = dataset.CUB(root=DATESET_PATH, is_train=True, data_len=None)
 trainloader = torch.utils.data.DataLoader(trainset, batch_size=BATCH_SIZE,
-                                          shuffle=True, num_workers=4, drop_last=False)
+                                          shuffle=True, num_workers=0, drop_last=False)
 testset = dataset.CUB(root=DATESET_PATH, is_train=False, data_len=None)
 testloader = torch.utils.data.DataLoader(testset, batch_size=BATCH_SIZE,
-                                         shuffle=False, num_workers=4, drop_last=False)
+                                         shuffle=False, num_workers=0, drop_last=False)
 # define model
 net = model.attention_net(topN=PROPOSAL_NUM)
 
@@ -48,8 +49,8 @@ schedulers = [MultiStepLR(raw_optimizer, milestones=[60, 100], gamma=0.1),
               MultiStepLR(concat_optimizer, milestones=[60, 100], gamma=0.1),
               MultiStepLR(part_optimizer, milestones=[60, 100], gamma=0.1),
               MultiStepLR(partcls_optimizer, milestones=[60, 100], gamma=0.1)]
-net = net.cuda()
-net = DataParallel(net)
+net = net.to(device)
+# net = DataParallel(net)
 
 for epoch in range(start_epoch, 5):
     for scheduler in schedulers:
@@ -58,7 +59,7 @@ for epoch in range(start_epoch, 5):
     _print('--' * 50)
     net.train()
     for i, data in enumerate(trainloader):
-        img, label = data[0].cuda(), data[1].cuda()
+        img, label = data[0].to(device), data[1].to(device)
         batch_size = img.size(0)
         raw_optimizer.zero_grad()
         part_optimizer.zero_grad()
@@ -99,7 +100,7 @@ for epoch in range(start_epoch, 5):
         net.eval()
         for i, data in enumerate(trainloader):
             with torch.no_grad():
-                img, label = data[0].cuda(), data[1].cuda()
+                img, label = data[0].to(device), data[1].to(device)
                 batch_size = img.size(0)
                 _, concat_logits, _, _, _ = net(img)
                 # calculate loss
@@ -127,7 +128,7 @@ for epoch in range(start_epoch, 5):
         total = 0
         for i, data in enumerate(testloader):
             with torch.no_grad():
-                img, label = data[0].cuda(), data[1].cuda()
+                img, label = data[0].to(device), data[1].to(device)
                 batch_size = img.size(0)
                 _, concat_logits, _, _, _ = net(img)
                 # calculate loss

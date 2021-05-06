@@ -6,6 +6,7 @@ from core import resnet
 import numpy as np
 from core.anchors import generate_default_anchor_maps, hard_nms
 from config import CAT_NUM, PROPOSAL_NUM, NUM_CLASS
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
 # Navigator
@@ -72,10 +73,10 @@ class attention_net(nn.Module):
         top_n_cdds = [hard_nms(x, topn=self.topN, iou_thresh=0.25) for x in all_cdds]
         top_n_cdds = np.array(top_n_cdds)
         top_n_index = top_n_cdds[:, :, -1].astype(np.int)
-        top_n_index = torch.from_numpy(top_n_index).cuda()
+        top_n_index = torch.from_numpy(top_n_index).to(device)
         top_n_prob = torch.gather(rpn_score, dim=1, index=top_n_index)
         # 数据进行下采样，抽取重要信息，减少计算量
-        part_imgs = torch.zeros([batch, self.topN, 3, 224, 224]).cuda()
+        part_imgs = torch.zeros([batch, self.topN, 3, 224, 224]).to(device)
         for i in range(batch):
             for j in range(self.topN):
                 [y0, x0, y1, x1] = top_n_cdds[i][j, 1:5].astype(np.int)
@@ -107,7 +108,7 @@ def list_loss(logits, targets):
 
 # Navigator 的 loss function
 def ranking_loss(score, targets, proposal_num=PROPOSAL_NUM):
-    loss = Variable(torch.zeros(1).cuda())
+    loss = Variable(torch.zeros(1).to(device))
     batch_size = score.size(0)
     for i in range(proposal_num):
         targets_p = (targets > targets[:, i].unsqueeze(1)).type(torch.cuda.FloatTensor)
