@@ -57,6 +57,7 @@ for epoch in range(start_epoch, 5):
     _print('--' * 50)
     net.train()
     for i, data in enumerate(trainloader):
+        print("#Epoch: ", (i+1))
         img, label = data[0].to(device), data[1].to(device)
         batch_size = img.size(0)
         raw_optimizer.zero_grad()
