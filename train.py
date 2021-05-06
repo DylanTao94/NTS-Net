@@ -53,8 +53,6 @@ net = net.to(device)
 # net = DataParallel(net)
 
 for epoch in range(start_epoch, 5):
-    for scheduler in schedulers:
-        scheduler.step()
     # begin training
     _print('--' * 50)
     net.train()
@@ -91,6 +89,8 @@ for epoch in range(start_epoch, 5):
         part_optimizer.step()
         concat_optimizer.step()
         partcls_optimizer.step()
+        for scheduler in schedulers:
+            scheduler.step()
         progress_bar(i, len(trainloader), 'train')
 
     if epoch % SAVE_FREQ == 0:
