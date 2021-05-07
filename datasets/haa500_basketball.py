@@ -104,6 +104,8 @@ class haa500_basketball(data.Dataset):
             self.name_pattern = "img_%05d.jpg"
         elif self.modality == "flow":
             self.name_pattern = ["flow_x_%05d.jpg", "flow_y_%05d.jpg"]
+        elif self.modality == "both":
+            self.name_pattern = ["img_%05d.jpg", "flow_x_%05d.jpg", "flow_y_%05d.jpg"]
 
     def __getitem__(self, index):
         path, frame_index, target = self.data_items[index]
@@ -114,6 +116,16 @@ class haa500_basketball(data.Dataset):
         elif self.modality == "flow":
             flow_x = ReadImg(path, frame_index, self.new_width, self.new_width, self.is_color, self.name_pattern[0])
             flow_y = ReadImg(path, frame_index, self.new_width, self.new_width, self.is_color, self.name_pattern[1])
+            items.append(flow_x)
+            items.append(flow_y)
+        elif self.modality == "both":
+            rgb_path = path.split("/")
+            rgb_path[-2] = "haa500_basketball_frames"
+            rgb_path = "/".join(rgb_path)
+            frame = ReadImg(rgb_path, frame_index, self.new_width, self.new_width, self.is_color, self.name_pattern[0])
+            flow_x = ReadImg(path, frame_index, self.new_width, self.new_width, self.is_color, self.name_pattern[1])
+            flow_y = ReadImg(path, frame_index, self.new_width, self.new_width, self.is_color, self.name_pattern[2])
+            items.append(frame)
             items.append(flow_x)
             items.append(flow_y)
         else:
