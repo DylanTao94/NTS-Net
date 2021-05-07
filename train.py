@@ -82,26 +82,28 @@ def evaluate(model, dataloader, modality, phase):
                 frame = input[0].float().to(device)
                 label = target.to(device)
                 raw_logits, concat_logits, part_logits, _, top_n_prob = model(frame)
+                # calculate loss
+                concat_loss = criterion(concat_logits, label)
+                # calculate accuracy
+                _, concat_predict = torch.max(concat_logits, 1)
+                n_sample += batch_size
+                correct += torch.sum(concat_predict.data == label.data)
+                loss += concat_loss.item() * batch_size
             elif modality == "flow":
                 flow_x = input[0].float().to(device)
                 flow_y = input[1].float().to(device)
                 label = target.to(device)
                 raw_logits_x, concat_logits_x, part_logits_x, _, top_n_prob_x = model(flow_x)
                 raw_logits_y, concat_logits_y, part_logits_y, _, top_n_prob_y = model(flow_y)
-                raw_logits, concat_logits, part_logits, top_n_prob = (raw_logits_x+raw_logits_y, concat_logits_x+concat_logits_y, part_logits_x+part_logits_y, top_n_prob_x+top_n_prob_y)
-            elif modality == "both":
-                frame = input[0].float().to(device)
-                flow_x = input[1].float().to(device)
-                flow_y = input[2].float().to(device)
-                label = target.to(device)
-                raw_logits, concat_logits, part_logits, _, top_n_prob = model(frame) + model(flow_x) + model(flow_y)
-            # calculate loss
-            concat_loss = criterion(concat_logits, label)
-            # calculate accuracy
-            _, concat_predict = torch.max(concat_logits, 1)
-            n_sample += batch_size
-            correct += torch.sum(concat_predict.data == label.data)
-            loss += concat_loss.item() * batch_size
+                # calculate loss
+                concat_loss_x = criterion(concat_logits_x, label)
+                concat_loss_y = criterion(concat_logits_y, label)
+                concat_loss = (concat_loss_x + concat_loss_y) / 2
+                # calculate accuracy
+                _, concat_predict = torch.max((concat_logits_x+concat_logits_y)/2, 1)
+                n_sample += batch_size
+                correct += torch.sum(concat_predict.data == label.data)
+                loss += concat_loss.item() * batch_size
 
     accuracy = float(correct) / n_sample
     loss = loss / n_sample
