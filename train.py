@@ -151,7 +151,11 @@ for epoch in range(start_epoch, args.epochs):
             flow_x = input[0].float().to(device)
             flow_y = input[1].float().to(device)
             label = target.to(device)
-            raw_logits, concat_logits, part_logits, _, top_n_prob = model(flow_x) + model(flow_y)
+            raw_logits_x, concat_logits_x, part_logits_x, _, top_n_prob_x = model(flow_x)
+            raw_logits_y, concat_logits_y, part_logits_y, _, top_n_prob_y = model(flow_y)
+            raw_logits, concat_logits, part_logits, top_n_prob = (
+            raw_logits_x + raw_logits_y, concat_logits_x + concat_logits_y, part_logits_x + part_logits_y,
+            top_n_prob_x + top_n_prob_y)
 
         # Teacher Loss 来帮助计算 Navigator Loss 的临时shape
         # 与partcls_loss仅仅改了一个shape
@@ -184,9 +188,9 @@ for epoch in range(start_epoch, args.epochs):
         # evaluate in the middle
         if i % args.print_freq == 0:
             # eval train test
-            train_loss, train_accuracy = eval(model, train_loader, args.modality, "train")
+            train_loss, train_accuracy = evaluate(model, train_loader, args.modality, "train")
             # eval val test
-            val_loss, val_accuracy = eval(model, val_loader, args.modality, "val")
+            val_loss, val_accuracy = evaluate(model, val_loader, args.modality, "val")
 
     # save model
     if epoch % args.save_freq == 0:
@@ -205,7 +209,7 @@ for epoch in range(start_epoch, args.epochs):
 
 print('finishing training')
 
-def eval(model, dataloader, modality, phase):
+def evaluate(model, dataloader, modality, phase):
     model.eval()
     loss = 0
     correct = 0
@@ -220,7 +224,9 @@ def eval(model, dataloader, modality, phase):
                 flow_x = input[0].float().to(device)
                 flow_y = input[1].float().to(device)
                 label = target.to(device)
-                raw_logits, concat_logits, part_logits, _, top_n_prob = model(flow_x) + model(flow_y)
+                raw_logits_x, concat_logits_x, part_logits_x, _, top_n_prob_x = model(flow_x)
+                raw_logits_y, concat_logits_y, part_logits_y, _, top_n_prob_y = model(flow_y)
+                raw_logits, concat_logits, part_logits, top_n_prob = (raw_logits_x+raw_logits_y, concat_logits_x+concat_logits_y, part_logits_x+part_logits_y, top_n_prob_x+top_n_prob_y)
             elif modality == "both":
                 frame = input[0].float().to(device)
                 flow_x = input[1].float().to(device)
