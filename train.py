@@ -71,6 +71,49 @@ parser.add_argument('-e', '--evaluate', dest='evaluate', action='store_true',
 global args
 args = parser.parse_args()
 
+def evaluate(model, dataloader, modality, phase):
+    model.eval()
+    loss = 0
+    correct = 0
+    n_sample = 0
+    for i, (input, target) in enumerate(dataloader):
+        with torch.no_grad():
+            if modality == "rgb":
+                frame = input[0].float().to(device)
+                label = target.to(device)
+                raw_logits, concat_logits, part_logits, _, top_n_prob = model(frame)
+            elif modality == "flow":
+                flow_x = input[0].float().to(device)
+                flow_y = input[1].float().to(device)
+                label = target.to(device)
+                raw_logits_x, concat_logits_x, part_logits_x, _, top_n_prob_x = model(flow_x)
+                raw_logits_y, concat_logits_y, part_logits_y, _, top_n_prob_y = model(flow_y)
+                raw_logits, concat_logits, part_logits, top_n_prob = (raw_logits_x+raw_logits_y, concat_logits_x+concat_logits_y, part_logits_x+part_logits_y, top_n_prob_x+top_n_prob_y)
+            elif modality == "both":
+                frame = input[0].float().to(device)
+                flow_x = input[1].float().to(device)
+                flow_y = input[2].float().to(device)
+                label = target.to(device)
+                raw_logits, concat_logits, part_logits, _, top_n_prob = model(frame) + model(flow_x) + model(flow_y)
+            # calculate loss
+            concat_loss = criterion(concat_logits, label)
+            # calculate accuracy
+            _, concat_predict = torch.max(concat_logits, 1)
+            n_sample += batch_size
+            correct += torch.sum(concat_predict.data == label.data)
+            loss += concat_loss.item() * batch_size
+
+    accuracy = float(correct) / n_sample
+    loss = loss / n_sample
+    print(
+        'epoch:{} - {} loss: {:.3f} and {} acc: {:.3f} total samples: {}'.format(
+            epoch,
+            phase,
+            loss,
+            phase,
+            accuracy,
+            n_sample))
+    return loss, accuracy
 # data loading
 train_setting_file = "train_%s_split%d.txt" % (args.modality, args.split)
 train_split_file = os.path.join(args.settings, args.dataset, train_setting_file)
@@ -137,6 +180,9 @@ schedulers = [MultiStepLR(raw_optimizer, milestones=[60, 100], gamma=0.1),
               MultiStepLR(partcls_optimizer, milestones=[60, 100], gamma=0.1)]
 
 model = model.to(device)
+
+
+
 
 for epoch in range(start_epoch, args.epochs):
     # begin training
@@ -209,46 +255,3 @@ for epoch in range(start_epoch, args.epochs):
 
 print('finishing training')
 
-def evaluate(model, dataloader, modality, phase):
-    model.eval()
-    loss = 0
-    correct = 0
-    n_sample = 0
-    for i, (input, target) in enumerate(dataloader):
-        with torch.no_grad():
-            if modality == "rgb":
-                frame = input[0].float().to(device)
-                label = target.to(device)
-                raw_logits, concat_logits, part_logits, _, top_n_prob = model(frame)
-            elif modality == "flow":
-                flow_x = input[0].float().to(device)
-                flow_y = input[1].float().to(device)
-                label = target.to(device)
-                raw_logits_x, concat_logits_x, part_logits_x, _, top_n_prob_x = model(flow_x)
-                raw_logits_y, concat_logits_y, part_logits_y, _, top_n_prob_y = model(flow_y)
-                raw_logits, concat_logits, part_logits, top_n_prob = (raw_logits_x+raw_logits_y, concat_logits_x+concat_logits_y, part_logits_x+part_logits_y, top_n_prob_x+top_n_prob_y)
-            elif modality == "both":
-                frame = input[0].float().to(device)
-                flow_x = input[1].float().to(device)
-                flow_y = input[2].float().to(device)
-                label = target.to(device)
-                raw_logits, concat_logits, part_logits, _, top_n_prob = model(frame) + model(flow_x) + model(flow_y)
-            # calculate loss
-            concat_loss = criterion(concat_logits, label)
-            # calculate accuracy
-            _, concat_predict = torch.max(concat_logits, 1)
-            n_sample += batch_size
-            correct += torch.sum(concat_predict.data == label.data)
-            loss += concat_loss.item() * batch_size
-
-    accuracy = float(correct) / n_sample
-    loss = loss / n_sample
-    print(
-        'epoch:{} - {} loss: {:.3f} and {} acc: {:.3f} total samples: {}'.format(
-            epoch,
-            phase,
-            loss,
-            phase,
-            accuracy,
-            n_sample))
-    return loss, accuracy

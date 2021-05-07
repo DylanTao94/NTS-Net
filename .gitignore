@@ -2,3 +2,6 @@
 .idea
 /datasets/haa500_basketball_flows/
 /datasets/haa500_basketball_frames/
+/optic_flow/images/
+/rgb/images/
+/models/
