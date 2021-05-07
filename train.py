@@ -114,6 +114,44 @@ def evaluate(model, dataloader, modality, phase):
             accuracy,
             n_sample))
     return loss, accuracy
+
+
+def train(frame, label):
+    raw_logits, concat_logits, part_logits, _, top_n_prob = model(frame)
+
+    # Teacher Loss 来帮助计算 Navigator Loss 的临时shape
+    # 与partcls_loss仅仅改了一个shape
+    part_loss = nts_net.list_loss(part_logits.view(batch_size * PROPOSAL_NUM, -1),
+                                  label.unsqueeze(1).repeat(1, PROPOSAL_NUM).view(-1)).view(batch_size, PROPOSAL_NUM)
+    # Feature detector loss
+    raw_loss = criterion(raw_logits, label)
+    # Scrutinizing loss
+    concat_loss = criterion(concat_logits, label)
+    # Navigator loss
+    rank_loss = nts_net.ranking_loss(top_n_prob, part_loss)
+    # Teacher loss
+    partcls_loss = criterion(part_logits.view(batch_size * PROPOSAL_NUM, -1),
+                             label.unsqueeze(1).repeat(1, PROPOSAL_NUM).view(-1))
+    total_loss = raw_loss + rank_loss + concat_loss + partcls_loss
+
+    raw_optimizer.zero_grad()
+    part_optimizer.zero_grad()
+    concat_optimizer.zero_grad()
+    partcls_optimizer.zero_grad()
+
+    total_loss.backward()
+    raw_optimizer.step()
+    part_optimizer.step()
+    concat_optimizer.step()
+    partcls_optimizer.step()
+    for scheduler in schedulers:
+        scheduler.step
+
+
+
+
+
+
 # data loading
 train_setting_file = "train_%s_split%d.txt" % (args.modality, args.split)
 train_split_file = os.path.join(args.settings, args.dataset, train_setting_file)
@@ -183,7 +221,6 @@ model = model.to(device)
 
 
 
-
 for epoch in range(start_epoch, args.epochs):
     # begin training
     model.train()
@@ -192,44 +229,13 @@ for epoch in range(start_epoch, args.epochs):
         if args.modality == "rgb":
             frame = input[0].float().to(device)
             label = target.to(device)
-            raw_logits, concat_logits, part_logits, _, top_n_prob = model(frame)
+            train(frame, label)
         elif args.modality == "flow":
             flow_x = input[0].float().to(device)
             flow_y = input[1].float().to(device)
             label = target.to(device)
-            raw_logits_x, concat_logits_x, part_logits_x, _, top_n_prob_x = model(flow_x)
-            raw_logits_y, concat_logits_y, part_logits_y, _, top_n_prob_y = model(flow_y)
-            raw_logits, concat_logits, part_logits, top_n_prob = (
-            raw_logits_x + raw_logits_y, concat_logits_x + concat_logits_y, part_logits_x + part_logits_y,
-            top_n_prob_x + top_n_prob_y)
-
-        # Teacher Loss 来帮助计算 Navigator Loss 的临时shape
-        # 与partcls_loss仅仅改了一个shape
-        part_loss = nts_net.list_loss(part_logits.view(batch_size * PROPOSAL_NUM, -1),
-                                    label.unsqueeze(1).repeat(1, PROPOSAL_NUM).view(-1)).view(batch_size, PROPOSAL_NUM)
-        # Feature detector loss
-        raw_loss = criterion(raw_logits, label)
-        # Scrutinizing loss
-        concat_loss = criterion(concat_logits, label)
-        # Navigator loss
-        rank_loss = nts_net.ranking_loss(top_n_prob, part_loss)
-        # Teacher loss
-        partcls_loss = criterion(part_logits.view(batch_size * PROPOSAL_NUM, -1),
-                                 label.unsqueeze(1).repeat(1, PROPOSAL_NUM).view(-1))
-        total_loss = raw_loss + rank_loss + concat_loss + partcls_loss
-
-        raw_optimizer.zero_grad()
-        part_optimizer.zero_grad()
-        concat_optimizer.zero_grad()
-        partcls_optimizer.zero_grad()
-
-        total_loss.backward()
-        raw_optimizer.step()
-        part_optimizer.step()
-        concat_optimizer.step()
-        partcls_optimizer.step()
-        for scheduler in schedulers:
-            scheduler.step
+            train(flow_x, label)
+            train(flow_y, label)
 
         # evaluate in the middle
         if i % args.print_freq == 0:
@@ -254,4 +260,3 @@ for epoch in range(start_epoch, args.epochs):
             os.path.join(save_dir, '%03d.ckpt' % epoch))
 
 print('finishing training')
-

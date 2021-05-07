@@ -5,3 +5,5 @@
 /optic_flow/images/
 /rgb/images/
 /models/
+/datasets/haa500_basketball_frames/
+*.jpg
