@@ -146,6 +146,6 @@ for i, (input, target) in enumerate(val_loader):
 accuracy = float(correct) / n_sample
 loss = loss / n_sample
 print(
-    'loss: {:.3f} and {} acc: {:.3f}'.format(
+    'loss: {:.3f} and acc: {:.3f}'.format(
         loss,
-        accuracy,))
+        accuracy))
