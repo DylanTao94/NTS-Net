@@ -1,5 +1,5 @@
 NUM_CLASS = 7 #class 数量
-BATCH_SIZE = 16
+BATCH_SIZE = 2
 PROPOSAL_NUM = 5 # M
 CAT_NUM = 3 # K
 INPUT_SIZE = (448, 448)  # (w, h)
@@ -8,4 +8,4 @@ WD = 1e-4
 SAVE_FREQ = 1
 resume = ''
 test_model = 'model.ckpt'
-save_dir = '/content/NTS-Net/models/'
+save_dir = './models/'
